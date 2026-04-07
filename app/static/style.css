@@ -2,31 +2,34 @@
   --bg: #2f6db8;
   --bg-2: #89b8f0;
   --card: #f2f7ff;
+  --text: #10223d;
   --muted: #2f527f;
   --accent: #1c63b0;
   --accent-hover: #155292;
   --error: #8e2020;
   --ring: #9fc3eb;
-        45deg,
-        rgba(255, 255, 255, 0.06) 0,
   --deep: #0f2d55;
 }
 
 * {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-    justify-items: center;
   font-family: Tahoma, Verdana, "Trebuchet MS", sans-serif;
   color: var(--text);
   background:
-    width: min(100%, 700px);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.24), transparent 26%),
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.06) 0,
       rgba(255, 255, 255, 0.06) 10px,
       rgba(255, 255, 255, 0.02) 10px,
       rgba(255, 255, 255, 0.02) 20px
     ),
+    linear-gradient(180deg, var(--bg-2), var(--bg));
   display: grid;
   place-items: center;
   padding: 24px;
@@ -35,15 +38,11 @@ body {
 .container {
   width: 100%;
   max-width: 980px;
-    justify-self: start;
-    width: 100%;
   background: linear-gradient(180deg, #d7e8fb 0, #c7dcf5 48px, #dce9f8 48px, #dce9f8 100%);
   border: 1px solid #1f4a7f;
   border-radius: 8px;
   box-shadow:
     inset 0 1px 0 #ffffff,
-    justify-self: start;
-    width: 100%;
     inset 0 -1px 0 #95b4d8,
     0 18px 28px rgba(10, 32, 61, 0.38);
   padding: 18px;
@@ -182,7 +181,6 @@ h1 {
 }
 
 .preview-mock.after::before {
-  background: linear-gradient(160deg, #facc15, #f97316);
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
 }
 
@@ -373,14 +371,8 @@ h1 {
   background-position: 0 0, 0 8px, 8px -8px, -8px 0;
 }
 
-input[type="file"] {
-  width: 100%;
-  border: 1px solid #8eaed1;
-  border-radius: 6px;
-  padding: 10px;
-  background: #ffffff;
-}
-
+input[type="file"],
+input[type="url"],
 select {
   width: 100%;
   border: 1px solid #8eaed1;
@@ -466,6 +458,14 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  .image-stage {
+    min-height: 220px;
+  }
+
+  .process-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .top-nav {
     gap: 6px;
   }
@@ -475,12 +475,8 @@ button:disabled {
     padding: 6px 8px;
   }
 
-  .image-stage {
-    min-height: 220px;
-  }
-
-  .process-steps {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .hero-logo {
+    width: min(100%, 560px);
   }
 }
 
