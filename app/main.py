@@ -1,5 +1,6 @@
 import os
 import time
+import logging
 from collections import defaultdict, deque
 from io import BytesIO
 
@@ -11,6 +12,7 @@ from fastapi import Request
 from PIL import Image, UnidentifiedImageError
 
 app = FastAPI(title="Background Remover MVP", version="0.1.0")
+logger = logging.getLogger(__name__)
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
@@ -101,6 +103,7 @@ async def remove_background(request: Request, file: UploadFile = File(...)) -> S
         png.save(result, format="PNG")
         result.seek(0)
     except Exception as exc:
+        logger.exception("Background removal failed")
         raise HTTPException(status_code=500, detail="Background removal failed") from exc
 
     safe_name = (file.filename or "image").rsplit(".", 1)[0]
