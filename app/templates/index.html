@@ -3,13 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Remove Background</title>
+    <title>Remove Logo Background</title>
     <link rel="stylesheet" href="/static/style.css" />
   </head>
   <body>
     <main class="container">
-      <h1>Remove White Background</h1>
-      <p class="subtitle">Upload one image and get a transparent PNG in seconds.</p>
+      <h1>Remove Logo Background</h1>
+      <p class="subtitle">Upload your image, watch each processing phase in real time, and download a transparent PNG.</p>
+
+      <div class="format-row">
+        <span class="format-pill">Input: JPG</span>
+        <span class="format-pill">Input: PNG</span>
+        <span class="format-pill">Input: WEBP</span>
+        <span class="format-pill">Input: BMP</span>
+        <span class="format-pill output">Output: PNG (transparent)</span>
+      </div>
 
       <form id="uploadForm" class="card">
         <input id="fileInput" name="file" type="file" accept="image/*" required />
@@ -28,6 +36,13 @@
           <div class="progress-track">
             <div id="progressBar" class="progress-bar"></div>
           </div>
+
+          <ul id="processSteps" class="process-steps">
+            <li data-step="upload">Upload</li>
+            <li data-step="validate">Validate</li>
+            <li data-step="segment">Segment</li>
+            <li data-step="export">Export</li>
+          </ul>
         </div>
 
         <button id="submitBtn" type="submit">Remove Background</button>
@@ -48,11 +63,13 @@
             <img id="afterPreview" alt="Result preview" class="hidden" />
             <p id="afterPlaceholder" class="placeholder">Processed image will appear here.</p>
           </div>
+          <div class="result-actions">
+            <a id="downloadLink" class="download hidden">Download Result</a>
+          </div>
         </article>
       </section>
 
       <p id="status" class="status"></p>
-      <a id="downloadLink" class="download hidden">Download Result</a>
 
       <footer class="legal">
         <a href="/privacy">Privacy</a>
@@ -76,21 +93,69 @@
       const progressBar = document.getElementById('progressBar');
       const progressLabel = document.getElementById('progressLabel');
       const progressPercent = document.getElementById('progressPercent');
+      const processSteps = document.querySelectorAll('#processSteps li');
 
       let beforeObjectUrl = null;
       let afterObjectUrl = null;
+      let processingInterval = null;
 
       function setStatus(message, isError = false) {
         statusEl.textContent = message;
         statusEl.classList.toggle('error', isError);
       }
 
+      function setProcessStep(stepName, done = false) {
+        processSteps.forEach((step) => {
+          if (step.dataset.step === stepName) {
+            step.classList.add('active');
+            if (done) {
+              step.classList.add('done');
+              step.classList.remove('active');
+            }
+          }
+        });
+      }
+
+      function clearProcessSteps() {
+        processSteps.forEach((step) => {
+          step.classList.remove('active');
+          step.classList.remove('done');
+        });
+      }
+
+      function startProcessingTimeline() {
+        const timeline = [
+          { label: 'Validating image...', step: 'validate', progress: 84 },
+          { label: 'Segmenting foreground...', step: 'segment', progress: 91 },
+          { label: 'Exporting transparent PNG...', step: 'export', progress: 97 },
+        ];
+
+        let index = 0;
+        clearInterval(processingInterval);
+        processingInterval = setInterval(() => {
+          if (index >= timeline.length) {
+            clearInterval(processingInterval);
+            return;
+          }
+
+          const item = timeline[index];
+          progressLabel.textContent = item.label;
+          progressBar.style.width = `${item.progress}%`;
+          progressPercent.textContent = `${item.progress}%`;
+          setProcessStep(item.step, true);
+          setStatus(item.label);
+          index += 1;
+        }, 650);
+      }
+
       function resetProgress() {
+        clearInterval(processingInterval);
         progressWrap.classList.add('hidden');
         progressWrap.classList.remove('indeterminate');
         progressBar.style.width = '0%';
         progressLabel.textContent = 'Uploading...';
         progressPercent.textContent = '0%';
+        clearProcessSteps();
       }
 
       function showBeforePreview(file) {
@@ -140,6 +205,8 @@
         progressBar.style.width = '0%';
         progressLabel.textContent = 'Uploading...';
         progressPercent.textContent = '0%';
+        clearProcessSteps();
+        setProcessStep('upload');
 
         const data = new FormData();
         data.append('file', fileInput.files[0]);
@@ -156,8 +223,12 @@
                 return;
               }
               const percent = Math.min(100, Math.round((progressEvent.loaded / progressEvent.total) * 100));
-              progressBar.style.width = `${percent}%`;
-              progressPercent.textContent = `${percent}%`;
+              const capped = Math.min(percent, 82);
+              progressBar.style.width = `${capped}%`;
+              progressPercent.textContent = `${capped}%`;
+              if (percent >= 100) {
+                setProcessStep('upload', true);
+              }
             };
 
             xhr.onloadstart = () => {
@@ -188,9 +259,10 @@
 
             xhr.onloadend = () => {
               progressWrap.classList.add('indeterminate');
-              progressLabel.textContent = 'Processing image...';
+              progressLabel.textContent = 'Server processing...';
               progressPercent.textContent = '...';
-              setStatus('Processing image...');
+              setProcessStep('validate', true);
+              startProcessingTimeline();
             };
 
             xhr.send(data);
@@ -210,6 +282,7 @@
           downloadLink.href = url;
           downloadLink.download = 'transparent.png';
           downloadLink.classList.remove('hidden');
+          setProcessStep('export', true);
           progressWrap.classList.remove('indeterminate');
           progressLabel.textContent = 'Completed';
           progressPercent.textContent = '100%';
