@@ -2,6 +2,7 @@ import os
 import time
 import logging
 import tempfile
+import importlib
 from urllib.parse import urlparse
 from collections import defaultdict, deque
 from io import BytesIO
@@ -13,7 +14,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi import Request
 from PIL import Image, UnidentifiedImageError
-from yt_dlp import YoutubeDL
 
 app = FastAPI(title="Background Remover MVP", version="0.1.0")
 logger = logging.getLogger(__name__)
@@ -283,6 +283,9 @@ async def youtube_to_mp3(background_tasks: BackgroundTasks, url: str = Form(...)
     outtmpl = str(tmp_dir / "%(id)s.%(ext)s")
 
     try:
+        yt_dlp_module = importlib.import_module("yt_dlp")
+        youtube_dl_class = getattr(yt_dlp_module, "YoutubeDL")
+
         ydl_opts = {
             "format": "bestaudio/best",
             "outtmpl": outtmpl,
@@ -298,7 +301,7 @@ async def youtube_to_mp3(background_tasks: BackgroundTasks, url: str = Form(...)
             ],
         }
 
-        with YoutubeDL(ydl_opts) as ydl:
+        with youtube_dl_class(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
 
         duration = int(info.get("duration") or 0)
