@@ -9,7 +9,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi import Request
 from PIL import Image, UnidentifiedImageError
-from rembg import remove
 
 app = FastAPI(title="Background Remover MVP", version="0.1.0")
 
@@ -94,6 +93,8 @@ async def remove_background(request: Request, file: UploadFile = File(...)) -> S
         raise HTTPException(status_code=400, detail="Invalid image file") from exc
 
     try:
+        from rembg import remove
+
         out_bytes = remove(raw)
         png = Image.open(BytesIO(out_bytes)).convert("RGBA")
         result = BytesIO()
