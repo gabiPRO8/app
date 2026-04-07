@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Remove Background</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Remove White Background</h1>
+      <p class="subtitle">Upload one image and get a transparent PNG in seconds.</p>
+
+      <form id="uploadForm" class="card">
+        <input id="fileInput" name="file" type="file" accept="image/*" required />
+        <button id="submitBtn" type="submit">Remove Background</button>
+      </form>
+
+      <p id="status" class="status"></p>
+      <a id="downloadLink" class="download hidden">Download Result</a>
+
+      <footer class="legal">
+        <a href="/privacy">Privacy</a>
+        <span>|</span>
+        <a href="/terms">Terms</a>
+      </footer>
+    </main>
+
+    <script>
+      const form = document.getElementById('uploadForm');
+      const fileInput = document.getElementById('fileInput');
+      const statusEl = document.getElementById('status');
+      const submitBtn = document.getElementById('submitBtn');
+      const downloadLink = document.getElementById('downloadLink');
+
+      function setStatus(message, isError = false) {
+        statusEl.textContent = message;
+        statusEl.classList.toggle('error', isError);
+      }
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!fileInput.files.length) {
+          setStatus('Please select an image.', true);
+          return;
+        }
+
+        submitBtn.disabled = true;
+        setStatus('Processing image...');
+        downloadLink.classList.add('hidden');
+
+        const data = new FormData();
+        data.append('file', fileInput.files[0]);
+
+        try {
+          const response = await fetch('/api/remove-bg', {
+            method: 'POST',
+            body: data,
+          });
+
+          if (!response.ok) {
+            const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+            throw new Error(error.detail || 'Request failed');
+          }
+
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+
+          downloadLink.href = url;
+          downloadLink.download = 'transparent.png';
+          downloadLink.classList.remove('hidden');
+          setStatus('Done. Click download.');
+        } catch (err) {
+          setStatus(err.message || 'Unexpected error', true);
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

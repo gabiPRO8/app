@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: bg-remover-mvp
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: MAX_FILE_MB
+        value: 10
+      - key: RATE_LIMIT_PER_MINUTE
+        value: 20
