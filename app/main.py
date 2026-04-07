@@ -20,6 +20,9 @@ templates = Jinja2Templates(directory="app/templates")
 MAX_FILE_MB = int(os.getenv("MAX_FILE_MB", "10"))
 MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024
 RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "20"))
+WHITE_THRESHOLD = int(os.getenv("WHITE_THRESHOLD", "245"))
+WHITE_SOFTNESS = int(os.getenv("WHITE_SOFTNESS", "20"))
+MAX_DIMENSION = int(os.getenv("MAX_DIMENSION", "1800"))
 
 # Simple in-memory limiter for MVP usage.
 # For multi-instance production, replace with Redis-backed limiting.
@@ -50,6 +53,42 @@ def _enforce_rate_limit(client_ip: str) -> None:
         )
 
     entries.append(now)
+
+
+def _remove_white_background(raw: bytes) -> BytesIO:
+    image = Image.open(BytesIO(raw)).convert("RGBA")
+
+    # Resize very large images to keep memory usage predictable on free instances.
+    width, height = image.size
+    max_side = max(width, height)
+    if max_side > MAX_DIMENSION:
+        scale = MAX_DIMENSION / max_side
+        image = image.resize((int(width * scale), int(height * scale)))
+
+    pixels = image.load()
+    w, h = image.size
+    threshold = max(0, min(255, WHITE_THRESHOLD))
+    softness = max(1, min(80, WHITE_SOFTNESS))
+
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = pixels[x, y]
+            min_rgb = min(r, g, b)
+
+            if min_rgb >= threshold:
+                pixels[x, y] = (r, g, b, 0)
+                continue
+
+            if min_rgb >= threshold - softness:
+                # Smooth edge alpha for near-white pixels.
+                ratio = (threshold - min_rgb) / softness
+                new_alpha = int(max(0, min(255, a * ratio)))
+                pixels[x, y] = (r, g, b, new_alpha)
+
+    result = BytesIO()
+    image.save(result, format="PNG")
+    result.seek(0)
+    return result
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -95,13 +134,7 @@ async def remove_background(request: Request, file: UploadFile = File(...)) -> S
         raise HTTPException(status_code=400, detail="Invalid image file") from exc
 
     try:
-        from rembg import remove
-
-        out_bytes = remove(raw)
-        png = Image.open(BytesIO(out_bytes)).convert("RGBA")
-        result = BytesIO()
-        png.save(result, format="PNG")
-        result.seek(0)
+        result = _remove_white_background(raw)
     except Exception as exc:
         logger.exception("Background removal failed")
         raise HTTPException(status_code=500, detail="Background removal failed") from exc
