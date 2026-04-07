@@ -61,6 +61,45 @@ h1 {
   color: var(--muted);
 }
 
+.home-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.hero {
+  background: linear-gradient(180deg, #f6fbff 0, #e6f1fd 100%);
+}
+
+.hero-kicker {
+  margin: 0;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: #315b8a;
+  font-weight: 700;
+}
+
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.tool-card {
+  align-content: start;
+}
+
+.tool-card h2 {
+  margin: 0;
+  color: #133f74;
+}
+
+.tool-card p {
+  margin: 0;
+  color: #40648f;
+  min-height: 42px;
+}
+
 .format-row {
   margin: 0 0 16px;
   display: flex;
@@ -312,6 +351,10 @@ button:disabled {
 
 @media (max-width: 860px) {
   .preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tools-grid {
     grid-template-columns: 1fr;
   }
 

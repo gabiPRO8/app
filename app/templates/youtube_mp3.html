@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>YouTube to MP3 | InternetOfTools</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>YouTube to MP3</h1>
+      <p class="subtitle">Paste a YouTube URL and check conversion availability.</p>
+
+      <form id="ytForm" class="card">
+        <label for="ytUrl">YouTube URL</label>
+        <input id="ytUrl" name="url" type="url" placeholder="https://www.youtube.com/watch?v=..." required />
+        <p class="hint">Use only content you own or are explicitly authorized to process.</p>
+        <button id="ytSubmit" type="submit">Check Tool</button>
+      </form>
+
+      <p id="ytStatus" class="status"></p>
+
+      <footer class="legal">
+        <a href="/">Home</a>
+        <span>|</span>
+        <a href="/tools/remove-bg">Remove Background</a>
+      </footer>
+    </main>
+
+    <script>
+      const form = document.getElementById('ytForm');
+      const statusEl = document.getElementById('ytStatus');
+      const button = document.getElementById('ytSubmit');
+
+      function setStatus(message, isError = false) {
+        statusEl.textContent = message;
+        statusEl.classList.toggle('error', isError);
+      }
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const url = document.getElementById('ytUrl').value.trim();
+        if (!url) {
+          setStatus('Please paste a valid URL.', true);
+          return;
+        }
+
+        button.disabled = true;
+        setStatus('Checking tool status...');
+
+        try {
+          const body = new FormData();
+          body.append('url', url);
+
+          const response = await fetch('/api/youtube-to-mp3', {
+            method: 'POST',
+            body,
+          });
+
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(payload.detail || 'Request failed');
+          }
+
+          setStatus(payload.detail || 'Tool status updated.');
+        } catch (error) {
+          setStatus(error.message || 'Unexpected error', true);
+        } finally {
+          button.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

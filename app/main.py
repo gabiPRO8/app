@@ -1,6 +1,7 @@
 import os
 import time
 import logging
+from urllib.parse import urlparse
 from collections import defaultdict, deque
 from io import BytesIO
 
@@ -235,8 +236,18 @@ def _remove_background_advanced(raw: bytes) -> BytesIO:
 
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request) -> HTMLResponse:
+async def home(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse("home.html", {"request": request})
+
+
+@app.get("/tools/remove-bg", response_class=HTMLResponse)
+async def remove_bg_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/tools/youtube-mp3", response_class=HTMLResponse)
+async def youtube_mp3_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse("youtube_mp3.html", {"request": request})
 
 
 @app.get("/privacy", response_class=HTMLResponse)
@@ -252,6 +263,25 @@ async def terms(request: Request) -> HTMLResponse:
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok"}
+
+
+@app.post("/api/youtube-to-mp3")
+async def youtube_to_mp3(url: str = Form(...)) -> dict:
+    parsed = urlparse(url.strip())
+    host = (parsed.netloc or "").lower()
+    if not host:
+        raise HTTPException(status_code=400, detail="Invalid URL")
+
+    if "youtube.com" not in host and "youtu.be" not in host:
+        raise HTTPException(status_code=400, detail="Only YouTube links are accepted")
+
+    return {
+        "status": "coming_soon",
+        "detail": (
+            "YouTube to MP3 tool is being prepared. It will be enabled in the next update "
+            "for users processing content they own or are authorized to use."
+        ),
+    }
 
 
 @app.post("/api/remove-bg")
