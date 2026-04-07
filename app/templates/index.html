@@ -19,8 +19,37 @@
           <option value="advanced">Advanced: textured and multi-color backgrounds</option>
         </select>
         <p class="hint">Advanced mode is optimized for quality while staying within free-server limits.</p>
+
+        <div id="progressWrap" class="progress-wrap hidden" aria-live="polite">
+          <div class="progress-head">
+            <span id="progressLabel">Uploading...</span>
+            <span id="progressPercent">0%</span>
+          </div>
+          <div class="progress-track">
+            <div id="progressBar" class="progress-bar"></div>
+          </div>
+        </div>
+
         <button id="submitBtn" type="submit">Remove Background</button>
       </form>
+
+      <section class="preview-grid">
+        <article class="card preview-card">
+          <h2>Original</h2>
+          <div class="image-stage checkerboard">
+            <img id="beforePreview" alt="Original preview" class="hidden" />
+            <p id="beforePlaceholder" class="placeholder">Select an image to preview it here.</p>
+          </div>
+        </article>
+
+        <article class="card preview-card">
+          <h2>Result</h2>
+          <div class="image-stage checkerboard">
+            <img id="afterPreview" alt="Result preview" class="hidden" />
+            <p id="afterPlaceholder" class="placeholder">Processed image will appear here.</p>
+          </div>
+        </article>
+      </section>
 
       <p id="status" class="status"></p>
       <a id="downloadLink" class="download hidden">Download Result</a>
@@ -39,11 +68,61 @@
       const submitBtn = document.getElementById('submitBtn');
       const downloadLink = document.getElementById('downloadLink');
       const modeSelect = document.getElementById('modeSelect');
+      const beforePreview = document.getElementById('beforePreview');
+      const afterPreview = document.getElementById('afterPreview');
+      const beforePlaceholder = document.getElementById('beforePlaceholder');
+      const afterPlaceholder = document.getElementById('afterPlaceholder');
+      const progressWrap = document.getElementById('progressWrap');
+      const progressBar = document.getElementById('progressBar');
+      const progressLabel = document.getElementById('progressLabel');
+      const progressPercent = document.getElementById('progressPercent');
+
+      let beforeObjectUrl = null;
+      let afterObjectUrl = null;
 
       function setStatus(message, isError = false) {
         statusEl.textContent = message;
         statusEl.classList.toggle('error', isError);
       }
+
+      function resetProgress() {
+        progressWrap.classList.add('hidden');
+        progressWrap.classList.remove('indeterminate');
+        progressBar.style.width = '0%';
+        progressLabel.textContent = 'Uploading...';
+        progressPercent.textContent = '0%';
+      }
+
+      function showBeforePreview(file) {
+        if (beforeObjectUrl) {
+          URL.revokeObjectURL(beforeObjectUrl);
+        }
+        beforeObjectUrl = URL.createObjectURL(file);
+        beforePreview.src = beforeObjectUrl;
+        beforePreview.classList.remove('hidden');
+        beforePlaceholder.classList.add('hidden');
+      }
+
+      function clearAfterPreview() {
+        if (afterObjectUrl) {
+          URL.revokeObjectURL(afterObjectUrl);
+          afterObjectUrl = null;
+        }
+        afterPreview.removeAttribute('src');
+        afterPreview.classList.add('hidden');
+        afterPlaceholder.classList.remove('hidden');
+      }
+
+      fileInput.addEventListener('change', () => {
+        if (!fileInput.files.length) {
+          return;
+        }
+
+        showBeforePreview(fileInput.files[0]);
+        clearAfterPreview();
+        downloadLink.classList.add('hidden');
+        setStatus('Image selected. Ready to process.');
+      });
 
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -53,35 +132,102 @@
         }
 
         submitBtn.disabled = true;
-        setStatus('Processing image...');
+        setStatus('Uploading image...');
         downloadLink.classList.add('hidden');
+        clearAfterPreview();
+        progressWrap.classList.remove('hidden');
+        progressWrap.classList.remove('indeterminate');
+        progressBar.style.width = '0%';
+        progressLabel.textContent = 'Uploading...';
+        progressPercent.textContent = '0%';
 
         const data = new FormData();
         data.append('file', fileInput.files[0]);
         data.append('mode', modeSelect.value);
 
         try {
-          const response = await fetch('/api/remove-bg', {
-            method: 'POST',
-            body: data,
+          const response = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/remove-bg');
+            xhr.responseType = 'blob';
+
+            xhr.upload.onprogress = (progressEvent) => {
+              if (!progressEvent.lengthComputable) {
+                return;
+              }
+              const percent = Math.min(100, Math.round((progressEvent.loaded / progressEvent.total) * 100));
+              progressBar.style.width = `${percent}%`;
+              progressPercent.textContent = `${percent}%`;
+            };
+
+            xhr.onloadstart = () => {
+              progressWrap.classList.remove('indeterminate');
+            };
+
+            xhr.onload = () => {
+              const blob = xhr.response;
+              if (xhr.status >= 200 && xhr.status < 300) {
+                resolve({ ok: true, blob });
+                return;
+              }
+
+              const reader = new FileReader();
+              reader.onload = () => {
+                try {
+                  const parsed = JSON.parse(reader.result || '{}');
+                  reject(new Error(parsed.detail || 'Request failed'));
+                } catch {
+                  reject(new Error('Request failed'));
+                }
+              };
+              reader.onerror = () => reject(new Error('Request failed'));
+              reader.readAsText(blob);
+            };
+
+            xhr.onerror = () => reject(new Error('Network error'));
+
+            xhr.onloadend = () => {
+              progressWrap.classList.add('indeterminate');
+              progressLabel.textContent = 'Processing image...';
+              progressPercent.textContent = '...';
+              setStatus('Processing image...');
+            };
+
+            xhr.send(data);
           });
 
-          if (!response.ok) {
-            const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-            throw new Error(error.detail || 'Request failed');
+          if (afterObjectUrl) {
+            URL.revokeObjectURL(afterObjectUrl);
           }
 
-          const blob = await response.blob();
-          const url = URL.createObjectURL(blob);
+          const url = URL.createObjectURL(response.blob);
+          afterObjectUrl = url;
+
+          afterPreview.src = url;
+          afterPreview.classList.remove('hidden');
+          afterPlaceholder.classList.add('hidden');
 
           downloadLink.href = url;
           downloadLink.download = 'transparent.png';
           downloadLink.classList.remove('hidden');
-          setStatus('Done. Click download.');
+          progressWrap.classList.remove('indeterminate');
+          progressLabel.textContent = 'Completed';
+          progressPercent.textContent = '100%';
+          progressBar.style.width = '100%';
+          setStatus('Done. Preview updated and ready to download.');
         } catch (err) {
           setStatus(err.message || 'Unexpected error', true);
         } finally {
           submitBtn.disabled = false;
+          if (progressWrap.classList.contains('indeterminate')) {
+            setTimeout(() => {
+              resetProgress();
+            }, 1000);
+          } else {
+            setTimeout(() => {
+              resetProgress();
+            }, 1200);
+          }
         }
       });
     </script>
