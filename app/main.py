@@ -1,16 +1,19 @@
 import os
 import time
 import logging
+import tempfile
 from urllib.parse import urlparse
 from collections import defaultdict, deque
 from io import BytesIO
+from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi import Request
 from PIL import Image, UnidentifiedImageError
+from yt_dlp import YoutubeDL
 
 app = FastAPI(title="Background Remover MVP", version="0.1.0")
 logger = logging.getLogger(__name__)
@@ -27,6 +30,7 @@ MAX_DIMENSION = int(os.getenv("MAX_DIMENSION", "1800"))
 ADVANCED_TOLERANCE = int(os.getenv("ADVANCED_TOLERANCE", "46"))
 ADVANCED_SOFTNESS = int(os.getenv("ADVANCED_SOFTNESS", "24"))
 ADVANCED_BG_CLUSTERS = int(os.getenv("ADVANCED_BG_CLUSTERS", "8"))
+YTMP3_MAX_DURATION_SECONDS = int(os.getenv("YTMP3_MAX_DURATION_SECONDS", "1200"))
 
 # Simple in-memory limiter for MVP usage.
 # For multi-instance production, replace with Redis-backed limiting.
@@ -266,7 +270,7 @@ async def health() -> dict:
 
 
 @app.post("/api/youtube-to-mp3")
-async def youtube_to_mp3(url: str = Form(...)) -> dict:
+async def youtube_to_mp3(background_tasks: BackgroundTasks, url: str = Form(...)) -> FileResponse:
     parsed = urlparse(url.strip())
     host = (parsed.netloc or "").lower()
     if not host:
@@ -275,13 +279,77 @@ async def youtube_to_mp3(url: str = Form(...)) -> dict:
     if "youtube.com" not in host and "youtu.be" not in host:
         raise HTTPException(status_code=400, detail="Only YouTube links are accepted")
 
-    return {
-        "status": "coming_soon",
-        "detail": (
-            "YouTube to MP3 tool is being prepared. It will be enabled in the next update "
-            "for users processing content they own or are authorized to use."
-        ),
-    }
+    tmp_dir = Path(tempfile.mkdtemp(prefix="ytmp3_"))
+    outtmpl = str(tmp_dir / "%(id)s.%(ext)s")
+
+    try:
+        ydl_opts = {
+            "format": "bestaudio/best",
+            "outtmpl": outtmpl,
+            "noplaylist": True,
+            "quiet": True,
+            "no_warnings": True,
+            "postprocessors": [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }
+            ],
+        }
+
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+
+        duration = int(info.get("duration") or 0)
+        if duration and duration > YTMP3_MAX_DURATION_SECONDS:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Video too long. Max duration is {YTMP3_MAX_DURATION_SECONDS // 60} minutes "
+                    "for this server tier."
+                ),
+            )
+
+        mp3_candidates = sorted(tmp_dir.glob("*.mp3"))
+        if not mp3_candidates:
+            raise HTTPException(status_code=500, detail="Could not create MP3 output")
+
+        mp3_path = mp3_candidates[0]
+        base_name = (info.get("title") or "audio").strip()[:80]
+        safe_name = "".join(ch if ch.isalnum() or ch in (" ", "-", "_") else "_" for ch in base_name)
+        if not safe_name:
+            safe_name = "audio"
+
+        def _cleanup_dir() -> None:
+            for item in tmp_dir.glob("*"):
+                try:
+                    item.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            try:
+                tmp_dir.rmdir()
+            except OSError:
+                pass
+
+        background_tasks.add_task(_cleanup_dir)
+        return FileResponse(
+            path=str(mp3_path),
+            media_type="audio/mpeg",
+            filename=f"{safe_name}.mp3",
+            background=background_tasks,
+        )
+    except HTTPException:
+        for item in tmp_dir.glob("*"):
+            item.unlink(missing_ok=True)
+        tmp_dir.rmdir()
+        raise
+    except Exception as exc:
+        logger.exception("YouTube to MP3 failed")
+        for item in tmp_dir.glob("*"):
+            item.unlink(missing_ok=True)
+        tmp_dir.rmdir()
+        raise HTTPException(status_code=500, detail="Could not process this video") from exc
 
 
 @app.post("/api/remove-bg")

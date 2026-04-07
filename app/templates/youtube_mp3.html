@@ -31,6 +31,7 @@
       const form = document.getElementById('ytForm');
       const statusEl = document.getElementById('ytStatus');
       const button = document.getElementById('ytSubmit');
+      let audioObjectUrl = null;
 
       function setStatus(message, isError = false) {
         statusEl.textContent = message;
@@ -57,12 +58,30 @@
             body,
           });
 
-          const payload = await response.json().catch(() => ({}));
           if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
             throw new Error(payload.detail || 'Request failed');
           }
 
-          setStatus(payload.detail || 'Tool status updated.');
+          const blob = await response.blob();
+          if (audioObjectUrl) {
+            URL.revokeObjectURL(audioObjectUrl);
+          }
+
+          audioObjectUrl = URL.createObjectURL(blob);
+
+          const contentDisposition = response.headers.get('content-disposition') || '';
+          const match = contentDisposition.match(/filename="?([^";]+)"?/i);
+          const filename = match ? match[1] : 'audio.mp3';
+
+          const anchor = document.createElement('a');
+          anchor.href = audioObjectUrl;
+          anchor.download = filename;
+          document.body.appendChild(anchor);
+          anchor.click();
+          document.body.removeChild(anchor);
+
+          setStatus('MP3 generated. Download should start automatically.');
         } catch (error) {
           setStatus(error.message || 'Unexpected error', true);
         } finally {
