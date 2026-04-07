@@ -103,6 +103,35 @@ h1 {
   font-weight: 700;
 }
 
+.retro-logo {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  background: linear-gradient(180deg, #fdfefe, #dce9f8);
+  border: 1px solid #6f99ca;
+  border-radius: 6px;
+  box-shadow: inset 0 1px 0 #ffffff;
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  width: fit-content;
+}
+
+.retro-logo-main {
+  color: #0f3a6f;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-shadow: 1px 1px 0 #ffffff;
+}
+
+.retro-logo-sub {
+  color: #2f618f;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 700;
+}
+
 .tools-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -111,6 +140,72 @@ h1 {
 
 .tool-card {
   align-content: start;
+}
+
+.tool-card.previewable {
+  position: relative;
+  overflow: hidden;
+}
+
+.tool-hover-preview {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.tool-card.previewable:hover .tool-hover-preview {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.preview-mock {
+  position: relative;
+  min-height: 80px;
+  border: 1px solid #7ea7d4;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #eef3f9, #d6e1ef);
+  box-shadow: inset 0 1px 0 #ffffff;
+}
+
+.preview-mock.before::before,
+.preview-mock.after::before {
+  content: "";
+  position: absolute;
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  top: 14px;
+  left: calc(50% - 26px);
+  background: linear-gradient(160deg, #facc15, #f97316);
+}
+
+.preview-mock.after {
+  background-image:
+    linear-gradient(45deg, #dce7f4 25%, transparent 25%),
+    linear-gradient(-45deg, #dce7f4 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #dce7f4 75%),
+    linear-gradient(-45deg, transparent 75%, #dce7f4 75%);
+  background-size: 14px 14px;
+  background-position: 0 0, 0 7px, 7px -7px, -7px 0;
+}
+
+.preview-mock.after::before {
+  background: linear-gradient(160deg, #facc15, #f97316);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
+}
+
+.preview-mock span {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  font-size: 0.68rem;
+  color: #204b7a;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
 }
 
 .tool-card h2 {
