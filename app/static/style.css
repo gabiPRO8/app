@@ -61,6 +61,30 @@ h1 {
   color: var(--muted);
 }
 
+.top-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.nav-btn {
+  display: inline-block;
+  text-decoration: none;
+  color: #164f93;
+  border: 1px solid #7ea7d4;
+  background: linear-gradient(180deg, #fefefe, #dce8f7);
+  padding: 7px 10px;
+  border-radius: 6px;
+  box-shadow: inset 0 1px 0 #ffffff;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.nav-btn:hover {
+  background: linear-gradient(180deg, #f0f7ff, #cedef2);
+}
+
 .home-shell {
   display: grid;
   gap: 16px;
@@ -356,6 +380,15 @@ button:disabled {
 
   .tools-grid {
     grid-template-columns: 1fr;
+  }
+
+  .top-nav {
+    gap: 6px;
+  }
+
+  .nav-btn {
+    font-size: 0.82rem;
+    padding: 6px 8px;
   }
 
   .image-stage {
