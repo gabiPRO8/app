@@ -2,17 +2,17 @@
   --bg: #2f6db8;
   --bg-2: #89b8f0;
   --card: #f2f7ff;
-  --text: #10223d;
   --muted: #2f527f;
   --accent: #1c63b0;
   --accent-hover: #155292;
   --error: #8e2020;
   --ring: #9fc3eb;
+        45deg,
+        rgba(255, 255, 255, 0.06) 0,
   --deep: #0f2d55;
 }
 
 * {
-  box-sizing: border-box;
 }
 
 body {
@@ -22,15 +22,11 @@ body {
   font-family: Tahoma, Verdana, "Trebuchet MS", sans-serif;
   color: var(--text);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.24), transparent 26%),
-    repeating-linear-gradient(
     width: min(100%, 700px);
       rgba(255, 255, 255, 0.06) 10px,
       rgba(255, 255, 255, 0.02) 10px,
       rgba(255, 255, 255, 0.02) 20px
     ),
-    margin: 2px auto 8px;
-    linear-gradient(180deg, var(--bg-2), var(--bg));
   display: grid;
   place-items: center;
   padding: 24px;
@@ -97,15 +93,16 @@ h1 {
 
 .hero {
   background: linear-gradient(180deg, #fafdff 0, #ecf4ff 42%, #e7f1ff 100%);
+  justify-items: center;
 }
 
 .hero-logo {
-  width: 100%;
-  max-width: 820px;
+  width: min(100%, 700px);
   border: 1px solid #9ebce0;
   border-radius: 6px;
   box-shadow: inset 0 1px 0 #ffffff;
   background: #ffffff;
+  margin: 2px auto 8px;
 }
 
 .hero-kicker {
@@ -115,6 +112,13 @@ h1 {
   letter-spacing: 1.2px;
   color: #315b8a;
   font-weight: 700;
+  justify-self: start;
+  width: 100%;
+}
+
+.hero .subtitle {
+  justify-self: start;
+  width: 100%;
 }
 
 .tools-grid {
