@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="190" viewBox="0 0 1200 190" role="img" aria-label="Internet Of Tools 2000 logo">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#f3f8ff" />
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1200" height="190" rx="6" fill="url(#bg)" />
+  <text x="38" y="128" fill="#0b3f9f" font-family="Arial Black, Arial, sans-serif" font-size="96" font-weight="900" letter-spacing="2">
+    INTERNET OF TOOLS
+  </text>
+  <text x="1020" y="78" fill="#df2b16" font-family="Arial Black, Arial, sans-serif" font-size="72" font-weight="900">2000</text>
+  <text x="1018" y="136" fill="#c23b2a" font-family="Arial Black, Arial, sans-serif" font-size="38" font-weight="900">®</text>
+</svg>
