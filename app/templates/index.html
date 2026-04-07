@@ -13,6 +13,12 @@
 
       <form id="uploadForm" class="card">
         <input id="fileInput" name="file" type="file" accept="image/*" required />
+        <label for="modeSelect">Processing mode</label>
+        <select id="modeSelect" name="mode">
+          <option value="simple">Simple: white background and logos</option>
+          <option value="advanced">Advanced: textured and multi-color backgrounds</option>
+        </select>
+        <p class="hint">Advanced mode is optimized for quality while staying within free-server limits.</p>
         <button id="submitBtn" type="submit">Remove Background</button>
       </form>
 
@@ -32,6 +38,7 @@
       const statusEl = document.getElementById('status');
       const submitBtn = document.getElementById('submitBtn');
       const downloadLink = document.getElementById('downloadLink');
+      const modeSelect = document.getElementById('modeSelect');
 
       function setStatus(message, isError = false) {
         statusEl.textContent = message;
@@ -51,6 +58,7 @@
 
         const data = new FormData();
         data.append('file', fileInput.files[0]);
+        data.append('mode', modeSelect.value);
 
         try {
           const response = await fetch('/api/remove-bg', {

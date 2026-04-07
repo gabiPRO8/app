@@ -4,7 +4,7 @@ import logging
 from collections import defaultdict, deque
 from io import BytesIO
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -23,6 +23,9 @@ RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "20"))
 WHITE_THRESHOLD = int(os.getenv("WHITE_THRESHOLD", "245"))
 WHITE_SOFTNESS = int(os.getenv("WHITE_SOFTNESS", "20"))
 MAX_DIMENSION = int(os.getenv("MAX_DIMENSION", "1800"))
+ADVANCED_TOLERANCE = int(os.getenv("ADVANCED_TOLERANCE", "46"))
+ADVANCED_SOFTNESS = int(os.getenv("ADVANCED_SOFTNESS", "24"))
+ADVANCED_BG_CLUSTERS = int(os.getenv("ADVANCED_BG_CLUSTERS", "8"))
 
 # Simple in-memory limiter for MVP usage.
 # For multi-instance production, replace with Redis-backed limiting.
@@ -91,6 +94,146 @@ def _remove_white_background(raw: bytes) -> BytesIO:
     return result
 
 
+def _collect_border_clusters(
+    pixels, width: int, height: int, max_clusters: int
+) -> list[tuple[int, int, int]]:
+    bucket_size = 24
+    clusters: dict[tuple[int, int, int], list[int]] = {}
+    step = max(1, max(width, height) // 400)
+
+    def add_sample(x: int, y: int) -> None:
+        r, g, b, _ = pixels[x, y]
+        key = (r // bucket_size, g // bucket_size, b // bucket_size)
+        if key not in clusters:
+            clusters[key] = [0, 0, 0, 0]
+        bucket = clusters[key]
+        bucket[0] += 1
+        bucket[1] += r
+        bucket[2] += g
+        bucket[3] += b
+
+    for x in range(0, width, step):
+        add_sample(x, 0)
+        add_sample(x, height - 1)
+    for y in range(0, height, step):
+        add_sample(0, y)
+        add_sample(width - 1, y)
+
+    sorted_clusters = sorted(clusters.values(), key=lambda item: item[0], reverse=True)
+    selected = sorted_clusters[: max(1, min(16, max_clusters))]
+
+    if not selected:
+        return [(255, 255, 255)]
+
+    return [
+        (entry[1] // entry[0], entry[2] // entry[0], entry[3] // entry[0])
+        for entry in selected
+    ]
+
+
+def _min_distance_sq(color: tuple[int, int, int, int], refs: list[tuple[int, int, int]]) -> int:
+    r, g, b, _ = color
+    best = 255 * 255 * 3
+    for rr, gg, bb in refs:
+        dr = r - rr
+        dg = g - gg
+        db = b - bb
+        dist = dr * dr + dg * dg + db * db
+        if dist < best:
+            best = dist
+    return best
+
+
+def _remove_background_advanced(raw: bytes) -> BytesIO:
+    image = Image.open(BytesIO(raw)).convert("RGBA")
+
+    # Resize very large images to keep memory usage predictable on free instances.
+    width, height = image.size
+    max_side = max(width, height)
+    if max_side > MAX_DIMENSION:
+        scale = MAX_DIMENSION / max_side
+        image = image.resize((int(width * scale), int(height * scale)))
+
+    pixels = image.load()
+    w, h = image.size
+    refs = _collect_border_clusters(pixels, w, h, ADVANCED_BG_CLUSTERS)
+
+    tolerance = max(12, min(140, ADVANCED_TOLERANCE))
+    softness = max(4, min(80, ADVANCED_SOFTNESS))
+    tol_sq = tolerance * tolerance
+    seed_tol_sq = (tolerance + 18) * (tolerance + 18)
+    soft_sq = (tolerance + softness) * (tolerance + softness)
+
+    visited = bytearray(w * h)
+    queue: deque[int] = deque()
+
+    def push_if_background(x: int, y: int, threshold_sq: int) -> None:
+        idx = y * w + x
+        if visited[idx]:
+            return
+        if _min_distance_sq(pixels[x, y], refs) <= threshold_sq:
+            visited[idx] = 1
+            queue.append(idx)
+
+    for x in range(w):
+        push_if_background(x, 0, seed_tol_sq)
+        push_if_background(x, h - 1, seed_tol_sq)
+    for y in range(h):
+        push_if_background(0, y, seed_tol_sq)
+        push_if_background(w - 1, y, seed_tol_sq)
+
+    while queue:
+        idx = queue.popleft()
+        x = idx % w
+        y = idx // w
+
+        if x > 0:
+            push_if_background(x - 1, y, tol_sq)
+        if x + 1 < w:
+            push_if_background(x + 1, y, tol_sq)
+        if y > 0:
+            push_if_background(x, y - 1, tol_sq)
+        if y + 1 < h:
+            push_if_background(x, y + 1, tol_sq)
+
+    for y in range(h):
+        for x in range(w):
+            idx = y * w + x
+            r, g, b, a = pixels[x, y]
+
+            if visited[idx]:
+                pixels[x, y] = (r, g, b, 0)
+                continue
+
+            # Soft transition only on pixels adjacent to detected background.
+            is_adjacent_to_bg = False
+            if x > 0 and visited[idx - 1]:
+                is_adjacent_to_bg = True
+            elif x + 1 < w and visited[idx + 1]:
+                is_adjacent_to_bg = True
+            elif y > 0 and visited[idx - w]:
+                is_adjacent_to_bg = True
+            elif y + 1 < h and visited[idx + w]:
+                is_adjacent_to_bg = True
+
+            if not is_adjacent_to_bg:
+                continue
+
+            dist_sq = _min_distance_sq((r, g, b, a), refs)
+            if dist_sq <= soft_sq:
+                if soft_sq == tol_sq:
+                    alpha_scale = 0.0
+                else:
+                    alpha_scale = (dist_sq - tol_sq) / (soft_sq - tol_sq)
+                alpha_scale = max(0.0, min(1.0, alpha_scale))
+                pixels[x, y] = (r, g, b, int(a * alpha_scale))
+
+    result = BytesIO()
+    image.save(result, format="PNG")
+    result.seek(0)
+    return result
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
     return templates.TemplateResponse("index.html", {"request": request})
@@ -112,8 +255,16 @@ async def health() -> dict:
 
 
 @app.post("/api/remove-bg")
-async def remove_background(request: Request, file: UploadFile = File(...)) -> StreamingResponse:
+async def remove_background(
+    request: Request,
+    file: UploadFile = File(...),
+    mode: str = Form("simple"),
+) -> StreamingResponse:
     _enforce_rate_limit(_get_client_ip(request))
+
+    mode = (mode or "simple").strip().lower()
+    if mode not in {"simple", "advanced"}:
+        raise HTTPException(status_code=400, detail="Invalid mode")
 
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Only image files are allowed")
@@ -134,7 +285,10 @@ async def remove_background(request: Request, file: UploadFile = File(...)) -> S
         raise HTTPException(status_code=400, detail="Invalid image file") from exc
 
     try:
-        result = _remove_white_background(raw)
+        if mode == "advanced":
+            result = _remove_background_advanced(raw)
+        else:
+            result = _remove_white_background(raw)
     except Exception as exc:
         logger.exception("Background removal failed")
         raise HTTPException(status_code=500, detail="Background removal failed") from exc

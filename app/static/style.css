@@ -59,6 +59,25 @@ input[type="file"] {
   padding: 10px;
 }
 
+select {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 10px;
+  background: #fff;
+}
+
+label {
+  font-weight: 600;
+  color: #334155;
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
 button {
   border: 0;
   border-radius: 12px;

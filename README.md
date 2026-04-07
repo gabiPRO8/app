@@ -23,6 +23,7 @@ Open http://127.0.0.1:8000
 
 Endpoint: `POST /api/remove-bg`
 Form field: `file` (image)
+Form field: `mode` (`simple` or `advanced`)
 Response: PNG with alpha channel
 
 Example with curl:
@@ -30,8 +31,16 @@ Example with curl:
 ```bash
 curl -X POST "http://127.0.0.1:8000/api/remove-bg" \
   -F "file=@input.jpg" \
+  -F "mode=advanced" \
   --output output.png
 ```
+
+### Processing modes
+
+- `simple`: fast and low-memory, optimized for white backgrounds and logos
+- `advanced`: lightweight border-aware segmentation for textured or multi-color backgrounds
+
+Both modes are designed to run inside Render Free constraints.
 
 ## 4) Next deployment step
 
@@ -67,6 +76,11 @@ git push -u origin main
 3. Confirm env vars:
   - `MAX_FILE_MB=10`
   - `RATE_LIMIT_PER_MINUTE=20`
+  - `WHITE_THRESHOLD=245`
+  - `WHITE_SOFTNESS=20`
+  - `ADVANCED_TOLERANCE=46`
+  - `ADVANCED_SOFTNESS=24`
+  - `ADVANCED_BG_CLUSTERS=8`
 4. Deploy and test:
 
 ```bash
